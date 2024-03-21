@@ -1,0 +1,50 @@
+# This code was used for making the plot for average growth rates across cell lineages per replicate as shown figure S6N
+
+
+# Loading packages
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(writexl)
+library(ggplot2)
+
+# Set the file path
+path <- "C:\\Users\\askin\\OneDrive\\Documents\\Adrienne_Lab_Postdoc_Data\\vos3_paper_revision\\Mesophyll figure\\Mesophyll growth csvs\\Growth Rate\\Mesophyll_Growth_Rata_averaged.xlsx"
+
+# Creating a dataframe and grouping the data by genotype and layer
+df$Genotype <- factor(df$Genotype, levels = c("WT", "as2-7D"))
+df$Layer <- factor(df$Layer, levels = c("Outer", "Inner", "Avg_Outer_Inner", "Mesophyll"))
+df$Genotype_Layer <- factor(interaction(df$Genotype, df$Layer, sep = "."), 
+                            levels = c("WT.Outer", "WT.Inner", "WT.Avg_Outer_Inner", "WT.Mesophyll", 
+                                       "as2-7D.Outer", "as2-7D.Inner", "as2-7D.Avg_Outer_Inner", "as2-7D.Mesophyll"))
+
+# Calculate the average growth rate for each group, to be used for making the mean line
+df_means <- df %>%
+  group_by(Genotype, Genotype_Layer) %>%
+  summarise(Average_Growth_Rate = mean(Average_Growth_Rate), .groups = 'drop')
+
+# Calculating the jitter values for the plot
+jitter_x <- 0.15  # Adjust this value as needed
+jitter_y <- 0.4  # Adjust this value as needed
+
+# Generating the plot
+plot <- ggplot(df, aes(x = Genotype_Layer, y = Average_Growth_Rate, color = Genotype)) +
+  geom_point(position = position_jitter(width = jitter_x, height = jitter_y), size = 3, stroke = 2) +  # Add a white outline around the points
+  geom_errorbar(data = df_means, aes(ymin = Average_Growth_Rate, ymax = Average_Growth_Rate), width = 0.5, size = 1) +
+  scale_color_manual(values = c("WT" = "black", "as2-7D" = "red")) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.line = element_line(colour = "black", size = 1.5), # Adjusted size for thicker lines
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.position = "none"
+  ) +
+  labs(x = NULL, y = NULL) +
+  ylim(0, 15)  # Adjust the upper limit of the y-axis as needed
+
+# Display the plot
+print(plot)
+
+# Save the plot as a high-quality PNG image
+ggsave("Average_Growth_Rate_Plot_new.png", plot, width = 12, height = 10, dpi = 600)

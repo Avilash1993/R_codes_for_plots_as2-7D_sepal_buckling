@@ -1,0 +1,84 @@
+# This code was used for making the mesophyll cell growth rate plots in figure S6M
+
+# Load required libraries
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(writexl)
+library(ggplot2)
+
+# Setting the file path
+file_path <- "C:\\Users\\askin\\OneDrive\\Documents\\Adrienne_Lab_Postdoc_Data\\vos3_paper_revision\\Mesophyll figure\\Mesophyll growth csvs\\Growth Rate\\Mesophyll_Growth_Rate_assimilated.xlsx"
+
+# Import Mesophyll growth rate data
+MesophyllGrowthData <- read_excel(file_path) %>%
+  mutate(Genotype = factor(Genotype, levels = c("WT", "as2-7D")),
+         Replicate = factor(Replicate))
+
+# Define colors for genotypes
+genotype_colors <- c("WT" = "black", "as2-7D" = "red")
+
+# Preparing the summary file
+MesophyllGrowthData_grouped <- MesophyllGrowthData %>%
+  group_by(Genotype) %>%
+  summarise(Mean = mean(Growth_Rate, na.rm = TRUE),
+            SD = sd(Growth_Rate, na.rm = TRUE),
+            n = n())
+summary_stats <- MesophyllGrowthData %>%
+  group_by(Genotype) %>%
+  summarise(
+    Mean = mean(Growth_Rate, na.rm = TRUE),
+    Median = median(Growth_Rate, na.rm = TRUE),
+    SD = sd(Growth_Rate, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+# Write the summarized data to an Excel file
+write_xlsx(summary_stats, "Mesophyll_Growth_Rate_Summary.xlsx")
+
+
+# Performing t-test between WT and as2-7D and associating p-values with star annotation values
+
+t_test_result <- t.test(Growth_Rate ~ Genotype, data = MesophyllGrowthData)
+
+pvalue_to_staranno <- function(p) {
+  if (p > 0.05) {
+    "ns" 
+  } else if (p <= 0.05 & p > 0.001) {
+    "*"
+  } else if (p <= 0.001 & p > 0.0001) {
+    "**"
+  } else {
+    "***"
+  }
+}
+
+# Formatting and printing p-values
+
+p_value <- t_test_result$p.value
+p_star <- pvalue_to_staranno(p_value)
+print(paste("P-value:", p_value, "Significance:", p_star))
+
+
+# Making the plots (jitterplot with boxplots overlayed)
+
+plot <- ggplot(MesophyllGrowthData, aes(x = Genotype, y = Growth_Rate, color = Genotype)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.5, fill = NA) +
+  geom_jitter(size = 0.7, position = position_jitterdodge(dodge.width = 0.75)) +
+  scale_color_manual(values = genotype_colors) +
+  theme_minimal() +
+  theme(
+    plot.background = element_rect(fill = "white", color = "white"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(size = 1, colour = "black"),
+    axis.ticks = element_line(colour = "black"),
+    axis.text.x = element_blank(), 
+    axis.title.x = element_blank(), 
+    axis.title.y = element_blank(),
+    legend.position = "none"
+  )
+
+# Save the plot as a high-quality PNG image
+ggsave("MesophyllGrowthRate_dotplot.png", plot, width = 10, height = 6, dpi = 600)
