@@ -1,0 +1,81 @@
+# This code was used for making the plot for cell shinkage post osmotic treatment in Supplementary Figure S7U
+
+# Load the required packages
+library(readxl)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(writexl)
+library(scales)
+
+# Setting the file path
+path <- "C:\\Users\\askin\\OneDrive\\Documents\\Adrienne_Lab_Postdoc_Data\\vos3_paper_revision\\Revisions_for_Current_Biology\\Revision_data\\plots\\Osmotic_Cellular_analysis_Shrinkage_masterfile.xlsx"
+setwd("C:\\Users\\askin\\OneDrive\\Documents\\Adrienne_Lab_Postdoc_Data\\vos3_paper_revision\\Revisions_for_Current_Biology\\Revision_data\\plots")
+getwd()
+
+#Importing shrinkage data from excel file 
+ShrinkData <- read_excel(path)
+ShrinkData <- ShrinkData %>%
+filter(!is.na(Genotype))
+
+#Converting variables to factors 
+
+ShrinkData <- ShrinkData %>%
+mutate(Genotype = factor(Genotype, levels = c("WT", "as2-7D", "ML1::KRP1_WT", "ML1::KRP1_as2-7D")), Replicate_No = factor(Replicate_No)) %>%
+droplevels() 
+
+#Defining color palette
+genotype_colors <- c("WT" = "black", "as2-7D" = "red", "ML1::KRP1_WT" = "gray32", "ML1::KRP1_as2-7D" = "hotpink1")
+
+# Performing Pairwise t-test
+genotype_pvals <- pairwise.t.test(ShrinkData$`%_Shrinkage`, ShrinkData$Genotype, p.adjust.method = "bonferroni")$p.value
+
+# Converting the p-values to star annotations
+p_to_star <- function(p) {
+  ifelse(is.na(p), NA,
+    ifelse(p > 0.05, "ns",
+      ifelse(p > 0.001, "*",
+        ifelse(p > 0.0001, "**", "***"))))}
+pvals_long <- as.data.frame(as.table(genotype_pvals)) %>%
+  filter(!is.na(Freq)) %>%
+  rename(Group1 = Var1, Group2 = Var2, p_value = Freq) %>%
+  mutate(star = p_to_star(p_value))
+print(pvals_long)
+
+# Saving the p-value output to excel sheet
+write_xlsx(pvals_long,"p_values_for_shrinkage_comparison_all_genotypes.xlsx")
+
+# Calculating the mean, median, and standard deviation for the datasets
+summary_stats <- ShrinkData %>%
+  group_by(Genotype) %>%
+  summarise(
+    Mean = mean(`%_Shrinkage`, na.rm = TRUE) * 100,
+    Median = median(`%_Shrinkage`, na.rm = TRUE) * 100,
+    SD = sd(`%_Shrinkage`, na.rm = TRUE) * 100,
+    N = n()
+  )
+
+#Making the plot
+
+plot <- ggplot(ShrinkData, aes(x = Genotype, y = `%_Shrinkage` * 100,  color = Genotype)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.5, fill = NA) +
+  geom_jitter(size = 2.0, position = position_jitterdodge(dodge.width = 1, jitter.width = 0.3)) +
+  scale_color_manual(values = genotype_colors) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal() +
+  theme(
+    plot.background = element_rect(fill = "white"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(colour = "black"),
+    axis.title = element_text(size = 16, face = "bold"),
+    axis.text = element_text(size = 12),
+    legend.position = "none"
+  ) +
+  labs( x = "Genotype", y = "% Shrinkage")
+
+print(plot)
+
+# Save the plot as a high-quality PNG image
+ggsave("Osmotic_treatments_all_Genotypes_Cellular_shrinkage_new.png", plot, width = 12, height = 12, dpi = 600)
